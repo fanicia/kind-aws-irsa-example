@@ -1,0 +1,3 @@
+# kind-control-plane/apiserver-log
+2023-05-24T13:05:33.156178012Z stderr F I0524 13:05:33.155938       1 server.go:555] external host was not specified, using 172.18.0.3
+2023-05-24T13:05:33.157133303Z stderr F E0524 13:05:33.157064       1 run.go:74] "command failed" err="failed to parse service-account-issuer-key-file: open /etc/ca-certificates/irsa/oidc-issuer.key: no such file or directory"

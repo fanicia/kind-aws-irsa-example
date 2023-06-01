@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::530613193695:oidc-provider/s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1685609453"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1685609453:sub": "system:serviceaccount:default:s3-echoer"
+        }
+      }
+    }
+  ]
+}
