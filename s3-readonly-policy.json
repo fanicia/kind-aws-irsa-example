@@ -11,7 +11,7 @@
                 "s3:GetObject"
             ],
             "Resource": [
-                "arn:aws:s3:::aws-irsa-oidc-1685609453/*"
+                "arn:aws:s3:::aws-irsa-oidc-1718404614/*"
             ]
         }
     ]

@@ -4,12 +4,12 @@
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::530613193695:oidc-provider/s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1685609453"
+        "Federated": "arn:aws:iam::429144463179:oidc-provider/s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1718401119"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1685609453:sub": "system:serviceaccount:default:s3-echoer"
+          "s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1718401119:sub": "system:serviceaccount:default:s3-echoer"
         }
       }
     }

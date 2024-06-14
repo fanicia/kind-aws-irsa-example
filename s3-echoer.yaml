@@ -12,7 +12,7 @@ spec:
         command:
         - "sh"
         - "-c"
-        - "while true; do time=$(date +%s); echo \"hello $time\" > bucket-$time.txt; aws s3 cp bucket-$time.txt s3://demo-bucket-s3-echoer-1685609453; sleep 60; done"
+        - "while true; do time=$(date +%s); echo \"hello $time\" > bucket-$time.txt; aws s3 cp bucket-$time.txt s3://demo-bucket-s3-echoer-1718401119; sleep 600; done"
         env:
         - name: AWS_DEFAULT_REGION
           value: "eu-west-1"
