@@ -4,10 +4,10 @@
 export AWS_PAGER=""
 
 # bootstrap stuff
-suffix="run-7"
+suffix="run-1"
 
 SHORT_SLEEP_TIME="60"
-SLEEP_TIME="140"
+SLEEP_TIME="120"
 
 # Generate keys for k8s configuration
 rm -rf keys
