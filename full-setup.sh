@@ -4,7 +4,7 @@
 export AWS_PAGER=""
 
 # bootstrap stuff
-suffix="run-1"
+suffix="run-2"
 
 SHORT_SLEEP_TIME="60"
 SLEEP_TIME="120"
@@ -12,6 +12,10 @@ SLEEP_TIME="120"
 # Generate keys for k8s configuration
 rm -rf keys
 mkdir -p keys
+
+# make folder if it doesn't exist
+mkdir -p json
+mkdir -p echoer
 
 # create S3 Bucket
 export AWS_DEFAULT_REGION="eu-west-1"
@@ -35,7 +39,7 @@ export ISSUER_HOSTPATH=$HOSTNAME/$S3_BUCKET
 
 aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-cat <<EOF >s3-readonly-policy.json
+cat <<EOF >json/s3-readonly-policy.json
 {
     "Version": "2008-10-17",
     "Statement": [
@@ -55,10 +59,10 @@ cat <<EOF >s3-readonly-policy.json
     ]
 }
 EOF
-aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://s3-readonly-policy.json
+aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://json/s3-readonly-policy.json
 
 # Create discover.json and keys.json
-cat <<EOF >discovery.json
+cat <<EOF >json/discovery.json
 {
     "issuer": "https://$ISSUER_HOSTPATH/",
     "jwks_uri": "https://$ISSUER_HOSTPATH/keys.json",
@@ -80,10 +84,10 @@ cat <<EOF >discovery.json
 EOF
 #
 # This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
-go run ./main.go -key $PKCS_KEY | jq >keys.json
+go run ./main.go -key $PKCS_KEY | jq >json/keys.json
 
-aws s3 cp ./discovery.json s3://$S3_BUCKET/.well-known/openid-configuration
-aws s3 cp ./keys.json s3://$S3_BUCKET/keys.json
+aws s3 cp ./json/discovery.json s3://$S3_BUCKET/.well-known/openid-configuration
+aws s3 cp ./json/keys.json s3://$S3_BUCKET/keys.json
 
 # Create OIDC identity provider
 export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
@@ -144,7 +148,7 @@ export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export PROVIDER_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/$ISSUER_HOSTPATH"
 export ROLE_NAME="s3-echoer-$suffix"
 
-cat >irp-trust-policy.json <<EOF
+cat >json/irp-trust-policy.json <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -167,7 +171,7 @@ EOF
 echo "Creating Demo role: $ROLE_NAME"
 aws iam create-role \
 	--role-name $ROLE_NAME \
-	--assume-role-policy-document file://irp-trust-policy.json
+	--assume-role-policy-document file://json/irp-trust-policy.json
 
 aws iam attach-role-policy \
 	--role-name $ROLE_NAME \
@@ -194,8 +198,8 @@ echo "Almost there. Let's just give the webhook some time to get started ⏲"
 sleep $SHORT_SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
-sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-job/s3-echoer-job.yaml.template >s3-echoer.yaml
-kubectl create -f s3-echoer.yaml
+sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-template/s3-echoer-job.yaml.template >echoer/s3-echoer.yaml
+kubectl create -f echoer/s3-echoer.yaml
 
 echo "The Demo S3 bucket as below:"
 echo $TARGET_BUCKET

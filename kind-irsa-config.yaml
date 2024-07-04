@@ -8,10 +8,11 @@ kubeadmConfigPatches:
       service-account-signing-key-file: /etc/ca-certificates/irsa/oidc-issuer.key
       service-account-key-file: /etc/ca-certificates/irsa/oidc-issuer.pub
       api-audiences: sts.amazonaws.com
-      service-account-issuer: https://s3-eu-west-1.amazonaws.com/aws-irsa-oidc-1718404614
+      service-account-issuer: https://s3-eu-west-1.amazonaws.com/aws-irsa-oidc-run-2
 nodes:
 - role: control-plane
   extraMounts:
+  # TODO: handle the path here automagically
   - hostPath: /home/fanicia/github/kind-aws-irsa-example/keys/ # <-- only use full paths here. local paths won't work
     containerPath: /etc/ca-certificates/irsa/ # <-- Make sure to use a path under /ca-certificates as that is mounted in to the apiserver
     readOnly: true
