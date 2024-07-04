@@ -4,10 +4,10 @@
 export AWS_PAGER=""
 
 # bootstrap stuff
-suffix="run-1"
-SLEEP_TIME="25"
+suffix="run-4"
 
-bootstrap=$1
+SLEEP_TIME="40"
+LONG_SLEEP_TIME="200"
 
 # Generate keys for k8s configuration
 rm -rf keys
@@ -16,26 +16,26 @@ mkdir -p keys
 # create S3 Bucket
 export AWS_DEFAULT_REGION="eu-west-1"
 export S3_BUCKET="aws-irsa-oidc-$suffix"
-if [ $bootstrap = "true" ]; then
-	# Generate the keypair
-	PRIV_KEY="keys/oidc-issuer.key"
-	PUB_KEY="keys/oidc-issuer.key.pub"
-	PKCS_KEY="keys/oidc-issuer.pub"
 
-	# Generate a key pair
-	ssh-keygen -t rsa -b 2048 -f $PRIV_KEY -m pem -N ""
+# Generate the keypair
+PRIV_KEY="keys/oidc-issuer.key"
+PUB_KEY="keys/oidc-issuer.key.pub"
+PKCS_KEY="keys/oidc-issuer.pub"
 
-	# convert the SSH pubkey to PKCS8
-	ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
+# Generate a key pair
+ssh-keygen -t rsa -b 2048 -f $PRIV_KEY -m pem -N ""
 
-	aws s3api create-bucket --bucket $S3_BUCKET --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
+# convert the SSH pubkey to PKCS8
+ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
 
-	export HOSTNAME=s3-$AWS_DEFAULT_REGION.amazonaws.com
-	export ISSUER_HOSTPATH=$HOSTNAME/$S3_BUCKET
+aws s3api create-bucket --bucket $S3_BUCKET --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
 
-	aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+export HOSTNAME=s3-$AWS_DEFAULT_REGION.amazonaws.com
+export ISSUER_HOSTPATH=$HOSTNAME/$S3_BUCKET
 
-	cat <<EOF >s3-readonly-policy.json
+aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+cat <<EOF >s3-readonly-policy.json
 {
     "Version": "2008-10-17",
     "Statement": [
@@ -55,10 +55,10 @@ if [ $bootstrap = "true" ]; then
     ]
 }
 EOF
-	aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://s3-readonly-policy.json
+aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://s3-readonly-policy.json
 
-	# Create discover.json and keys.json
-	cat <<EOF >discovery.json
+# Create discover.json and keys.json
+cat <<EOF >discovery.json
 {
     "issuer": "https://$ISSUER_HOSTPATH/",
     "jwks_uri": "https://$ISSUER_HOSTPATH/keys.json",
@@ -78,28 +78,28 @@ EOF
     ]
 }
 EOF
-	#
-	# This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
-	go run ./main.go -key $PKCS_KEY | jq >keys.json
+#
+# This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
+go run ./main.go -key $PKCS_KEY | jq >keys.json
 
-	aws s3 cp ./discovery.json s3://$S3_BUCKET/.well-known/openid-configuration
-	aws s3 cp ./keys.json s3://$S3_BUCKET/keys.json
+aws s3 cp ./discovery.json s3://$S3_BUCKET/.well-known/openid-configuration
+aws s3 cp ./keys.json s3://$S3_BUCKET/keys.json
 
-	# Create OIDC identity provider
-	export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
+# Create OIDC identity provider
+export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
 
-	aws iam create-open-id-connect-provider \
-		--url https://$ISSUER_HOSTPATH \
-		--thumbprint-list $CA_THUMBPRINT \
-		--client-id-list sts.amazonaws.com
+aws iam create-open-id-connect-provider \
+	--url https://$ISSUER_HOSTPATH \
+	--thumbprint-list $CA_THUMBPRINT \
+	--client-id-list sts.amazonaws.com
 
-	echo "The service-account-issuer as below:"
-	echo "https://$ISSUER_HOSTPATH"
+echo "The service-account-issuer as below:"
+echo "https://$ISSUER_HOSTPATH"
 
-	# Setup k8s cluster:
-	kind delete cluster --name irsa
+# Setup k8s cluster:
+kind delete cluster --name irsa
 
-	cat <<EOF >kind-irsa-config.yaml
+cat <<EOF >kind-irsa-config.yaml
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 kubeadmConfigPatches:
@@ -120,18 +120,15 @@ nodes:
 - role: worker
 EOF
 
-	kind create cluster --config kind-irsa-config.yaml --name irsa
-	echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
-	# Install cert manager instead of messing with certs manually:
-	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.6/cert-manager.yaml
-	echo "cert manager has been applied. waiting a little bit again"
+kind create cluster --config kind-irsa-config.yaml --name irsa
+echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
+# Install cert manager instead of messing with certs manually:
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.6/cert-manager.yaml
+echo "cert manager has been applied. waiting a little bit again"
 
-	# return and let cert-manager get up
-	echo "returning. Check if cert-manager is up before re-running"
-	return 0
-fi
+echo "returning. Check if cert-manager is up before re-running"
 
-# sleep $SLEEP_TIME
+sleep $SLEEP_TIME
 
 # Setup k8s webhook auth stuff up. Heavily inspired by https://github.com/aws/amazon-eks-pod-identity-webhook/tree/master/deploy
 kubectl create -f pod-identity-webhook/auth.yaml
@@ -193,11 +190,10 @@ aws s3api create-bucket \
 	--create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION \
 	--region $AWS_DEFAULT_REGION
 
-sleep $SLEEP_TIME
 echo "Creating the pod-identity-webhook now. Hopefully all dependencies are up and running..."
 kubectl create -f pod-identity-webhook/deployment.yaml
 echo "Almost there. Let's just give the webhook some time to get started ⏲"
-sleep $SLEEP_TIME
+sleep $LONG_SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
 sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-job/s3-echoer-job.yaml.template >s3-echoer.yaml
