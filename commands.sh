@@ -4,10 +4,10 @@
 export AWS_PAGER=""
 
 # bootstrap stuff
-suffix="run-4"
+suffix="run-7"
 
-SLEEP_TIME="40"
-LONG_SLEEP_TIME="200"
+SHORT_SLEEP_TIME="60"
+SLEEP_TIME="140"
 
 # Generate keys for k8s configuration
 rm -rf keys
@@ -126,8 +126,6 @@ echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.6/cert-manager.yaml
 echo "cert manager has been applied. waiting a little bit again"
 
-echo "returning. Check if cert-manager is up before re-running"
-
 sleep $SLEEP_TIME
 
 # Setup k8s webhook auth stuff up. Heavily inspired by https://github.com/aws/amazon-eks-pod-identity-webhook/tree/master/deploy
@@ -193,7 +191,7 @@ aws s3api create-bucket \
 echo "Creating the pod-identity-webhook now. Hopefully all dependencies are up and running..."
 kubectl create -f pod-identity-webhook/deployment.yaml
 echo "Almost there. Let's just give the webhook some time to get started ⏲"
-sleep $LONG_SLEEP_TIME
+sleep $SHORT_SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
 sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-job/s3-echoer-job.yaml.template >s3-echoer.yaml
