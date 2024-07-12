@@ -4,10 +4,9 @@
 export AWS_PAGER=""
 
 # bootstrap stuff
-suffix="run-2"
+suffix="run-1"
 
-SHORT_SLEEP_TIME="60"
-SLEEP_TIME="120"
+SLEEP_TIME="20"
 
 # Generate keys for k8s configuration
 rm -rf keys
@@ -93,9 +92,9 @@ aws s3 cp ./json/keys.json s3://$S3_BUCKET/keys.json
 export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
 
 aws iam create-open-id-connect-provider \
-	--url https://$ISSUER_HOSTPATH \
-	--thumbprint-list $CA_THUMBPRINT \
-	--client-id-list sts.amazonaws.com
+  --url https://$ISSUER_HOSTPATH \
+  --thumbprint-list $CA_THUMBPRINT \
+  --client-id-list sts.amazonaws.com
 
 echo "The service-account-issuer as below:"
 echo "https://$ISSUER_HOSTPATH"
@@ -170,12 +169,12 @@ EOF
 
 echo "Creating Demo role: $ROLE_NAME"
 aws iam create-role \
-	--role-name $ROLE_NAME \
-	--assume-role-policy-document file://json/irp-trust-policy.json
+  --role-name $ROLE_NAME \
+  --assume-role-policy-document file://json/irp-trust-policy.json
 
 aws iam attach-role-policy \
-	--role-name $ROLE_NAME \
-	--policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+  --role-name $ROLE_NAME \
+  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
 
 # create service account for s3 echoer job and attach the iam role
 export S3_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query Role.Arn --output text)
@@ -188,14 +187,14 @@ kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
 
 echo "Creating demo target-bucket: $TARGET_BUCKET"
 aws s3api create-bucket \
-	--bucket $TARGET_BUCKET \
-	--create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION \
-	--region $AWS_DEFAULT_REGION
+  --bucket $TARGET_BUCKET \
+  --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION \
+  --region $AWS_DEFAULT_REGION
 
 echo "Creating the pod-identity-webhook now. Hopefully all dependencies are up and running..."
 kubectl create -f pod-identity-webhook/deployment.yaml
 echo "Almost there. Let's just give the webhook some time to get started ⏲"
-sleep $SHORT_SLEEP_TIME
+sleep $SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
 sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-template/s3-echoer-job.yaml.template >echoer/s3-echoer.yaml
