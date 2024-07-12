@@ -1,11 +1,16 @@
 ## Pre-reqs. Have creds for an AWS account, have kubectl, aws-cli, jq, go and kind installed.
 
 # don't paginate the results from the AWS cli
-export AWS_PAGER=""
+# export AWS_PAGER=""
 
-# bootstrap stuff
-suffix="run-1"
+# By changing the suffix, you can have multiple "versions" running at a time.
+# This is just a hacky way of easily running the script multiple times after each other with a fresh state.
+# Long-term, I should probably just have a clean-up script to call in between the runs.
+suffix="run-4"
 
+# Note: For slower hardware, you may need to bump this higher
+# Otherwise, you may see cert-manager not starting up in time to sign the certificate needed for the webhook
+# I recommend watching along with k9s or manual kubectl commands to check that things start up in the right order.
 SLEEP_TIME="20"
 
 # Generate keys for k8s configuration
@@ -18,7 +23,7 @@ mkdir -p echoer
 
 # create S3 Bucket
 export AWS_DEFAULT_REGION="eu-west-1"
-export S3_BUCKET="aws-irsa-oidc-$suffix"
+export S3_BUCKET="aws-irsa-oidc-discovery-$suffix"
 
 # Generate the keypair
 PRIV_KEY="keys/oidc-issuer.key"
@@ -180,7 +185,7 @@ aws iam attach-role-policy \
 export S3_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query Role.Arn --output text)
 
 # deploy s3 echoer job into k8s cluster
-export TARGET_BUCKET="demo-bucket-$ROLE_NAME"
+export TARGET_BUCKET="output-bucket-$ROLE_NAME"
 
 kubectl create sa s3-echoer
 kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
