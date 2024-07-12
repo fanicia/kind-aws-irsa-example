@@ -197,7 +197,7 @@ echo "Almost there. Let's just give the webhook some time to get started ⏲"
 sleep $SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
-sed -e "s/TIMESTAMP/${suffix}/g" s3-echoer-template/s3-echoer-job.yaml.template >echoer/s3-echoer.yaml
+sed -e "s/SUFFIX/${suffix}/g" s3-echoer-template/s3-echoer-job.yaml.template >echoer/s3-echoer.yaml
 kubectl create -f echoer/s3-echoer.yaml
 
 echo "The Demo S3 bucket as below:"
