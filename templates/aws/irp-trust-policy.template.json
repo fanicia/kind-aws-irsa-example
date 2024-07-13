@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "PROVIDER_ARN"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "ISSUER_HOSTPATH:sub": "system:serviceaccount:default:s3-echoer"
+        }
+      }
+    }
+  ]
+}

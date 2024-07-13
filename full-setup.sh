@@ -67,8 +67,7 @@ echo "https://$ISSUER_HOSTPATH"
 # Setup k8s cluster:
 kind delete cluster --name irsa
 
-sed -e "s\PWD\\${PWD}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
-sed -e "s\S3_BUCKET\\${S3_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
+sed -e "s\PWD\\${PWD}\g; s\S3_BUCKET\\${S3_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
 
 kind create cluster --config kind-irsa-config.yaml --name irsa
 echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
@@ -85,7 +84,6 @@ kubectl create -f pod-identity-webhook/cert.yaml
 kubectl create -f pod-identity-webhook/mutatingwebhook-ca-bundle.yaml
 
 ##### Deploy echoer
-
 export ISSUER_URL="https://s3-eu-west-1.amazonaws.com/$S3_BUCKET"
 
 # create iam role for s3 echoer job
@@ -94,26 +92,7 @@ export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export PROVIDER_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/$ISSUER_HOSTPATH"
 export ROLE_NAME="s3-echoer-$suffix"
 
-sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
-cat >json/irp-trust-policy.json <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "$PROVIDER_ARN"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "${ISSUER_HOSTPATH}:sub": "system:serviceaccount:default:s3-echoer"
-        }
-      }
-    }
-  ]
-}
-EOF
+sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g; s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/kind/irp-trust-policy.template.yaml >json/irp-trust-policy.json
 
 echo "Creating Demo role: $ROLE_NAME"
 aws iam create-role \
