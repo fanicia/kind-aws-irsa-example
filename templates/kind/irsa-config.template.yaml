@@ -1,0 +1,18 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+kubeadmConfigPatches:
+- |-
+  kind: ClusterConfiguration
+  apiServer:
+    extraArgs:
+      service-account-signing-key-file: /etc/ca-certificates/irsa/oidc-issuer.key
+      service-account-key-file: /etc/ca-certificates/irsa/oidc-issuer.pub
+      api-audiences: sts.amazonaws.com
+      service-account-issuer: https://s3-eu-west-1.amazonaws.com/S3_BUCKET
+nodes:
+- role: control-plane
+  extraMounts:
+  - hostPath: PWD/keys/ # <-- only use full paths here. local paths won't work
+    containerPath: /etc/ca-certificates/irsa/ # <-- Make sure to use a path under /ca-certificates as that is mounted in to the apiserver
+    readOnly: true
+- role: worker

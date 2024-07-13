@@ -40,50 +40,13 @@ export ISSUER_HOSTPATH=$HOSTNAME/$S3_BUCKET
 
 aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-cat <<EOF >json/s3-readonly-policy.json
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowPublicRead",
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "*"
-            },
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": [
-                "arn:aws:s3:::$S3_BUCKET/*"
-            ]
-        }
-    ]
-}
-EOF
+sed -e "s\S3_BUCKET\\${S3_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >json/s3-readonly-policy.json
+
 aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://json/s3-readonly-policy.json
 
 # Create discover.json and keys.json
-cat <<EOF >json/discovery.json
-{
-    "issuer": "https://$ISSUER_HOSTPATH/",
-    "jwks_uri": "https://$ISSUER_HOSTPATH/keys.json",
-    "authorization_endpoint": "urn:kubernetes:programmatic_authorization",
-    "response_types_supported": [
-        "id_token"
-    ],
-    "subject_types_supported": [
-        "public"
-    ],
-    "id_token_signing_alg_values_supported": [
-        "RS256"
-    ],
-    "claims_supported": [
-        "sub",
-        "iss"
-    ]
-}
-EOF
-#
+sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >json/discovery.json
+
 # This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
 go run ./main.go -key $PKCS_KEY | jq >json/keys.json
 
@@ -104,26 +67,8 @@ echo "https://$ISSUER_HOSTPATH"
 # Setup k8s cluster:
 kind delete cluster --name irsa
 
-cat <<EOF >kind-irsa-config.yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-kubeadmConfigPatches:
-- |-
-  kind: ClusterConfiguration
-  apiServer:
-    extraArgs:
-      service-account-signing-key-file: /etc/ca-certificates/irsa/oidc-issuer.key
-      service-account-key-file: /etc/ca-certificates/irsa/oidc-issuer.pub
-      api-audiences: sts.amazonaws.com
-      service-account-issuer: https://s3-eu-west-1.amazonaws.com/$S3_BUCKET
-nodes:
-- role: control-plane
-  extraMounts:
-  - hostPath: $PWD/keys/ # <-- only use full paths here. local paths won't work
-    containerPath: /etc/ca-certificates/irsa/ # <-- Make sure to use a path under /ca-certificates as that is mounted in to the apiserver
-    readOnly: true
-- role: worker
-EOF
+sed -e "s\PWD\\${PWD}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
+sed -e "s\S3_BUCKET\\${S3_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
 
 kind create cluster --config kind-irsa-config.yaml --name irsa
 echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
@@ -149,6 +94,7 @@ export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export PROVIDER_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/$ISSUER_HOSTPATH"
 export ROLE_NAME="s3-echoer-$suffix"
 
+sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
 cat >json/irp-trust-policy.json <<EOF
 {
   "Version": "2012-10-17",
@@ -199,7 +145,7 @@ echo "Almost there. Let's just give the webhook some time to get started ⏲"
 sleep $SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
-sed -e "s/SUFFIX/${suffix}/g" s3-echoer-template/s3-echoer-job.yaml.template >echoer/s3-echoer.yaml
+sed -e "s/SUFFIX/${suffix}/g" templates/s3-echoer/s3-echoer-job.template.yaml >echoer/s3-echoer.yaml
 kubectl create -f echoer/s3-echoer.yaml
 
 echo "The Demo S3 bucket as below:"
