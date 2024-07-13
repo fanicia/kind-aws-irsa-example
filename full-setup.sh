@@ -1,12 +1,9 @@
 ## Pre-reqs. Have creds for an AWS account, have kubectl, aws-cli, jq, go and kind installed.
 
-# don't paginate the results from the AWS cli
-# export AWS_PAGER=""
-
 # By changing the suffix, you can have multiple "versions" running at a time.
 # This is just a hacky way of easily running the script multiple times after each other with a fresh state.
 # Long-term, I should probably just have a clean-up script to call in between the runs.
-suffix="run-4"
+suffix="run-1"
 
 # Note: For slower hardware, you may need to bump this higher
 # Otherwise, you may see cert-manager not starting up in time to sign the certificate needed for the webhook
