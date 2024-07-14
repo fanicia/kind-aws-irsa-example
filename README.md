@@ -38,7 +38,7 @@ Long-term I may include a smarter way of cleaning up after a run, but I have ski
 
 I have run the script a bunch of times and I am yet to see *any* impact on the cost of my personal AWS Account, so if you clean up after using the script, you should not worry about the cost of the script.
 That said, I do not take responsibility of any costs you may see as a result of trying out the script.
-Always be careful not to over-provision anything in AWS, as it can be an expensive playground to use if not done right.
+Always be careful not to over-provision anything in AWS as it can be an expensive playground to use if not done right.
 
 ## Inspiration
 
