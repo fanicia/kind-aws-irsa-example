@@ -1,9 +1,12 @@
-## Pre-reqs. Have creds for an AWS account, have kubectl, aws-cli, jq, go and kind installed.
+# Pre-reqs: Have creds for an AWS account, have kubectl, aws-cli, jq, go and kind installed.
+
+# Unset pager for Linux users
+export AWS_PAGER=""
 
 # By changing the suffix, you can have multiple "versions" running at a time.
 # This is just a hacky way of easily running the script multiple times after each other with a fresh state.
 # Long-term, I should probably just have a clean-up script to call in between the runs.
-suffix="run-1"
+suffix="run-2"
 
 # Note: For slower hardware, you may need to bump this higher
 # Otherwise, you may see cert-manager not starting up in time to sign the certificate needed for the webhook
@@ -15,12 +18,12 @@ rm -rf keys
 mkdir -p keys
 
 # make folder if it doesn't exist
-mkdir -p json
+mkdir -p aws
 mkdir -p echoer
 
 # create S3 Bucket
 export AWS_DEFAULT_REGION="eu-west-1"
-export S3_BUCKET="aws-irsa-oidc-discovery-$suffix"
+export DISCOVERY_BUCKET="aws-irsa-oidc-discovery-$suffix"
 
 # Generate the keypair
 PRIV_KEY="keys/oidc-issuer.key"
@@ -33,25 +36,24 @@ ssh-keygen -t rsa -b 2048 -f $PRIV_KEY -m pem -N ""
 # convert the SSH pubkey to PKCS8
 ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
 
-aws s3api create-bucket --bucket $S3_BUCKET --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
+aws s3api create-bucket --bucket $DISCOVERY_BUCKET --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
 
 export HOSTNAME=s3-$AWS_DEFAULT_REGION.amazonaws.com
-export ISSUER_HOSTPATH=$HOSTNAME/$S3_BUCKET
+export ISSUER_HOSTPATH=$HOSTNAME/$DISCOVERY_BUCKET
 
-aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+aws s3api put-public-access-block --bucket $DISCOVERY_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-sed -e "s\S3_BUCKET\\${S3_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >json/s3-readonly-policy.json
-
-aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file://json/s3-readonly-policy.json
-
-# Create discover.json and keys.json
-sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >json/discovery.json
+# poor mans templating using sed. note the use of \ as a delimiter to avoid clashing with characters in the templating files.
+sed -e "s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >aws/s3-readonly-policy.json
+aws s3api put-bucket-policy --bucket $DISCOVERY_BUCKET --policy file://aws/s3-readonly-policy.json
 
 # This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
-go run ./main.go -key $PKCS_KEY | jq >json/keys.json
+go run ./main.go -key $PKCS_KEY | jq >aws/keys.json
 
-aws s3 cp ./json/discovery.json s3://$S3_BUCKET/.well-known/openid-configuration
-aws s3 cp ./json/keys.json s3://$S3_BUCKET/keys.json
+# Create place discovery.json and keys.json in the discovery-bucket
+sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >aws/discovery.json
+aws s3 cp ./aws/discovery.json s3://$DISCOVERY_BUCKET/.well-known/openid-configuration
+aws s3 cp ./aws/keys.json s3://$DISCOVERY_BUCKET/keys.json
 
 # Create OIDC identity provider
 export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
@@ -67,10 +69,10 @@ echo "https://$ISSUER_HOSTPATH"
 # Setup k8s cluster:
 kind delete cluster --name irsa
 
-sed -e "s\PWD\\${PWD}\g; s\S3_BUCKET\\${S3_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
-
+sed -e "s\PWD\\${PWD}\g; s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
 kind create cluster --config kind-irsa-config.yaml --name irsa
 echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
+
 # Install cert manager instead of messing with certs manually:
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.6/cert-manager.yaml
 echo "cert manager has been applied. waiting a little bit again"
@@ -83,21 +85,18 @@ kubectl create -f pod-identity-webhook/service.yaml
 kubectl create -f pod-identity-webhook/cert.yaml
 kubectl create -f pod-identity-webhook/mutatingwebhook-ca-bundle.yaml
 
-##### Deploy echoer
-export ISSUER_URL="https://s3-eu-west-1.amazonaws.com/$S3_BUCKET"
-
 # create iam role for s3 echoer job
+export ISSUER_URL="https://s3-eu-west-1.amazonaws.com/$DISCOVERY_BUCKET"
 export ISSUER_HOSTPATH=$(echo $ISSUER_URL | cut -f 3- -d'/')
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export PROVIDER_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/$ISSUER_HOSTPATH"
 export ROLE_NAME="s3-echoer-$suffix"
 
-sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g; s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/kind/irp-trust-policy.template.yaml >json/irp-trust-policy.json
-
 echo "Creating Demo role: $ROLE_NAME"
+sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g; s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/irp-trust-policy.template.json >aws/irp-trust-policy.json
 aws iam create-role \
   --role-name $ROLE_NAME \
-  --assume-role-policy-document file://json/irp-trust-policy.json
+  --assume-role-policy-document file://aws/irp-trust-policy.json
 
 aws iam attach-role-policy \
   --role-name $ROLE_NAME \
@@ -120,7 +119,7 @@ aws s3api create-bucket \
 
 echo "Creating the pod-identity-webhook now. Hopefully all dependencies are up and running..."
 kubectl create -f pod-identity-webhook/deployment.yaml
-echo "Almost there. Let's just give the webhook some time to get started ⏲"
+echo "Almost there. Let's just give the webhook some time to get started. It needs to be ready before the echoer is deployed"
 sleep $SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
