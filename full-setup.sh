@@ -6,7 +6,7 @@ export AWS_PAGER=""
 # By changing the suffix, you can have multiple "versions" running at a time.
 # This is just a hacky way of easily running the script multiple times after each other with a fresh state.
 # Long-term, I should probably just have a clean-up script to call in between the runs.
-suffix="run-2"
+suffix="run-1"
 
 # Note: For slower hardware, you may need to bump this higher
 # Otherwise, you may see cert-manager not starting up in time to sign the certificate needed for the webhook
@@ -43,12 +43,11 @@ export ISSUER_HOSTPATH=$HOSTNAME/$DISCOVERY_BUCKET
 
 aws s3api put-public-access-block --bucket $DISCOVERY_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-# poor mans templating using sed. note the use of \ as a delimiter to avoid clashing with characters in the templating files.
+# poor man's templating using sed. note the use of \ as a delimiter to avoid clashing with characters in the templating files.
 sed -e "s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >aws/s3-readonly-policy.json
 aws s3api put-bucket-policy --bucket $DISCOVERY_BUCKET --policy file://aws/s3-readonly-policy.json
 
-# This assumes  k8s cluster > 1.16. if not, see https://github.com/aws/amazon-eks-pod-identity-webhook/blob/master/SELF_HOSTED_SETUP.md
-go run ./main.go -key $PKCS_KEY | jq >aws/keys.json
+go run -C keys-generator main.go -key "$PWD/$PKCS_KEY" | jq >aws/keys.json
 
 # Create place discovery.json and keys.json in the discovery-bucket
 sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >aws/discovery.json
