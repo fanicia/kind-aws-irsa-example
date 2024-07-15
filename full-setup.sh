@@ -25,17 +25,6 @@ mkdir -p echoer
 export AWS_DEFAULT_REGION="eu-west-1"
 export DISCOVERY_BUCKET="aws-irsa-oidc-discovery-$suffix"
 
-# Generate the keypair
-PRIV_KEY="keys/oidc-issuer.key"
-PUB_KEY="keys/oidc-issuer.key.pub"
-PKCS_KEY="keys/oidc-issuer.pub"
-
-# Generate a key pair
-ssh-keygen -t rsa -b 2048 -f $PRIV_KEY -m pem -N ""
-
-# convert the SSH pubkey to PKCS8
-ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
-
 aws s3api create-bucket --bucket $DISCOVERY_BUCKET --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
 
 export HOSTNAME=s3-$AWS_DEFAULT_REGION.amazonaws.com
@@ -47,12 +36,27 @@ aws s3api put-public-access-block --bucket $DISCOVERY_BUCKET --public-access-blo
 sed -e "s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >aws/s3-readonly-policy.json
 aws s3api put-bucket-policy --bucket $DISCOVERY_BUCKET --policy file://aws/s3-readonly-policy.json
 
+# Generate the keypair
+PRIV_KEY="keys/oidc-issuer.key"
+PUB_KEY="keys/oidc-issuer.key.pub"
+PKCS_KEY="keys/oidc-issuer.pub"
+
+# Generate a key pair
+ssh-keygen -t rsa -b 2048 -f $PRIV_KEY -m pem -N ""
+
+# convert the SSH pubkey to PKCS8
+ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
+
+# Use the PKCS_KEY to generate the JWKS key set for the JWKS endpoint of the Discovery Bucket
 go run -C keys-generator main.go -key "$PWD/$PKCS_KEY" | jq >aws/keys.json
 
-# Create place discovery.json and keys.json in the discovery-bucket
+# Create and place discovery.json and keys.json in the discovery-bucket
 sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >aws/discovery.json
 aws s3 cp ./aws/discovery.json s3://$DISCOVERY_BUCKET/.well-known/openid-configuration
 aws s3 cp ./aws/keys.json s3://$DISCOVERY_BUCKET/keys.json
+
+echo "The service-account-issuer as below:"
+echo "https://$ISSUER_HOSTPATH"
 
 # Create OIDC identity provider
 export CA_THUMBPRINT=$(openssl s_client -connect s3-$AWS_DEFAULT_REGION.amazonaws.com:443 -servername s3-$AWS_DEFAULT_REGION.amazonaws.com -showcerts </dev/null 2>/dev/null | openssl x509 -in /dev/stdin -sha1 -noout -fingerprint | cut -d '=' -f 2 | tr -d ':')
@@ -61,9 +65,6 @@ aws iam create-open-id-connect-provider \
   --url https://$ISSUER_HOSTPATH \
   --thumbprint-list $CA_THUMBPRINT \
   --client-id-list sts.amazonaws.com
-
-echo "The service-account-issuer as below:"
-echo "https://$ISSUER_HOSTPATH"
 
 # Setup k8s cluster:
 kind delete cluster --name irsa
