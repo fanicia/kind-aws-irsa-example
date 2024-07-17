@@ -108,9 +108,6 @@ export S3_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query Role.Arn --
 # deploy s3 echoer job into k8s cluster
 export TARGET_BUCKET="output-bucket-$ROLE_NAME"
 
-kubectl create sa s3-echoer
-kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
-
 echo "Creating demo target-bucket: $TARGET_BUCKET"
 aws s3api create-bucket \
   --bucket $TARGET_BUCKET \
@@ -123,6 +120,8 @@ echo "Almost there. Let's just give the webhook some time to get started. It nee
 sleep $SLEEP_TIME
 echo "Creating the echoer. Cross your fingers!"
 
+kubectl create sa s3-echoer
+kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
 sed -e "s/SUFFIX/${suffix}/g" templates/s3-echoer/s3-echoer-job.template.yaml >echoer/s3-echoer.yaml
 kubectl create -f echoer/s3-echoer.yaml
 
