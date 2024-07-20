@@ -11,7 +11,7 @@ suffix="run-1"
 # Note: For slower hardware, you may need to bump this higher
 # Otherwise, you may see cert-manager not starting up in time to sign the certificate needed for the webhook
 # I recommend watching along with k9s or manual kubectl commands to check that things start up in the right order.
-SLEEP_TIME="20"
+SLEEP_TIME="30"
 
 # Generate keys for k8s configuration
 rm -rf keys
