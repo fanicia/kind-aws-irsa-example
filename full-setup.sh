@@ -32,8 +32,8 @@ export ISSUER_HOSTPATH=$HOSTNAME/$DISCOVERY_BUCKET
 
 aws s3api put-public-access-block --bucket $DISCOVERY_BUCKET --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 
-# poor man's templating using sed. note the use of \ as a delimiter to avoid clashing with characters in the templating files.
-sed -e "s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/aws/s3-readonly-policy.template.json >aws/s3-readonly-policy.json
+# poor man's templating using sed. note the use of ; as a delimiter to avoid clashing with characters in the templating files.
+sed -e "s;DISCOVERY_BUCKET;${DISCOVERY_BUCKET};g" templates/aws/s3-readonly-policy.template.json >aws/s3-readonly-policy.json
 aws s3api put-bucket-policy --bucket $DISCOVERY_BUCKET --policy file://aws/s3-readonly-policy.json
 
 # Generate the keypair
@@ -51,7 +51,7 @@ ssh-keygen -e -m PKCS8 -f $PUB_KEY >$PKCS_KEY
 go run -C keys-generator main.go -key "$PWD/$PKCS_KEY" | jq >aws/keys.json
 
 # Create and place discovery.json and keys.json in the discovery-bucket
-sed -e "s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/discovery.template.json >aws/discovery.json
+sed -e "s;ISSUER_HOSTPATH;${ISSUER_HOSTPATH};g" templates/aws/discovery.template.json >aws/discovery.json
 aws s3 cp ./aws/discovery.json s3://$DISCOVERY_BUCKET/.well-known/openid-configuration
 aws s3 cp ./aws/keys.json s3://$DISCOVERY_BUCKET/keys.json
 
@@ -69,7 +69,7 @@ aws iam create-open-id-connect-provider \
 # Setup k8s cluster:
 kind delete cluster --name irsa
 
-sed -e "s\PWD\\${PWD}\g; s\DISCOVERY_BUCKET\\${DISCOVERY_BUCKET}\g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
+sed -e "s;PWD;${PWD};g; s;DISCOVERY_BUCKET;${DISCOVERY_BUCKET};g" templates/kind/irsa-config.template.yaml >kind-irsa-config.yaml
 kind create cluster --config kind-irsa-config.yaml --name irsa
 echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
 
@@ -93,7 +93,7 @@ export PROVIDER_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/$ISSUER_HOSTPATH"
 export ROLE_NAME="s3-echoer-$suffix"
 
 echo "Creating Demo role: $ROLE_NAME"
-sed -e "s\PROVIDER_ARN\\${PROVIDER_ARN}\g; s\ISSUER_HOSTPATH\\${ISSUER_HOSTPATH}\g" templates/aws/irp-trust-policy.template.json >aws/irp-trust-policy.json
+sed -e "s;PROVIDER_ARN;${PROVIDER_ARN};g; s;ISSUER_HOSTPATH;${ISSUER_HOSTPATH};g" templates/aws/irp-trust-policy.template.json >aws/irp-trust-policy.json
 aws iam create-role \
   --role-name $ROLE_NAME \
   --assume-role-policy-document file://aws/irp-trust-policy.json
@@ -122,7 +122,7 @@ echo "Creating the echoer. Cross your fingers!"
 
 kubectl create sa s3-echoer
 kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
-sed -e "s/SUFFIX/${suffix}/g" templates/s3-echoer/s3-echoer-job.template.yaml >echoer/s3-echoer.yaml
+sed -e "s;SUFFIX;${suffix};g" templates/s3-echoer/s3-echoer-job.template.yaml >echoer/s3-echoer.yaml
 kubectl create -f echoer/s3-echoer.yaml
 
 echo "The Demo S3 bucket as below:"
