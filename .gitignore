@@ -1,4 +1,4 @@
-keys/
+keys-*/
 echoer/
 aws/
-kind-irsa-config.yaml
+kind-irsa-*-config.yaml

@@ -21,7 +21,7 @@ spec:
           done
         env:
         - name: AWS_DEFAULT_REGION
-          value: "eu-west-1"
+          value: "us-east-2"
         - name: ENABLE_IRP
           value: "true"
       restartPolicy: Never

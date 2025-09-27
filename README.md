@@ -9,11 +9,13 @@ Furthermore, to avoid gold-plating this project out of the gate, I have included
 ## How to run it?
 
 Simply run the `full-setup.sh` script, and you should get a kind cluster with a Job `s3-echoer` that authenticates to your AWS Account and places a file in an output-bucket as a demo.
-As this script spins up a few different resources that depend on each other, you may need to adjust the `SLEEP_TIME` variable in the top of the script to allow longer time for resources to come up
-if you are running on older hardware.
+The script automatically waits for all dependencies (cert-manager, pod-identity-webhook) to be ready before proceeding.
 
-If you want to do multiple runs of the script in a row, you can tweak the `suffix` variable and set it to e.g. `run-1`, `run-2`, etc.
-That way, the buckets and other resources created will not clash on the naming between runs.
+Each run automatically generates a unique UUID-based identifier, allowing multiple isolated stacks to run simultaneously. If you want to use a specific identifier (for reproducibility or named stacks), provide it as an argument:
+
+```bash
+./full-setup.sh "my-dev-stack"
+```
 
 
 ## Prerequisites
@@ -25,14 +27,33 @@ To run the script you need to have credentials for an AWS Account and have the f
 * `jq`
 * `go`
 * `kind`
+* `uuidgen`
+* `ssh-keygen`
+* `openssl`
+* `fzf` (optional, for interactive stack selection during teardown)
 
 
 ## Cleaning up
 
-Once you have run the script, you should remember to clean up in your AWS Account.
-The script will create two buckets: `aws-irsa-oidc-discovery-run-X` and `output-bucket-s3-echoer-run-X`, an identity-provider `s3-eu-west-1.amazonaws.com/aws-irsa-oidc-discovery-run-X` and a role `s3-echoer-run-X`, which can be cleaned up using the aws-cli or the AWS Console.
+To clean up all resources created by the setup script, run:
 
-Long-term I may include a smarter way of cleaning up after a run, but I have skipped that for now.
+```bash
+./full-taredown.sh
+```
+
+The teardown script will automatically detect deployed stacks and present an interactive menu (if `fzf` is installed and multiple stacks exist). You can also specify a suffix directly:
+
+```bash
+./full-taredown.sh <suffix>
+```
+
+This script will delete:
+- Kind cluster (`irsa-<suffix>`)
+- IAM role (`s3-echoer-<suffix>`)
+- OIDC provider (`s3.us-east-2.amazonaws.com/aws-irsa-oidc-discovery-<suffix>`)
+- S3 buckets (`aws-irsa-oidc-discovery-<suffix>` and `output-bucket-s3-echoer-<suffix>`)
+- Local files specific to the stack (keys, configs, and generated manifests)
+- Empty `aws/` and `echoer/` directories (if no other stacks remain)
 
 ## Costs
 
