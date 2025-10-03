@@ -22,6 +22,9 @@ fi
 
 get_resource_names "$suffix"
 
+# Set stack directory
+STACK_DIR="$HOME/.kind-irsa/$suffix"
+
 echo ""
 echo "Starting teardown with suffix: $suffix"
 echo "This will delete the following resources:"
@@ -30,7 +33,7 @@ echo "  - IAM Role: $ROLE_NAME"
 echo "  - OIDC Provider: $ISSUER_HOSTPATH"
 echo "  - S3 Bucket: $DISCOVERY_BUCKET"
 echo "  - S3 Bucket: $TARGET_BUCKET"
-echo "  - Local files for stack: $suffix"
+echo "  - Stack directory: $STACK_DIR"
 echo ""
 
 # Delete Kind cluster
@@ -63,25 +66,13 @@ echo "Deleting discovery bucket: $DISCOVERY_BUCKET..."
 aws s3 rm s3://$DISCOVERY_BUCKET --recursive 2>/dev/null || echo "Bucket already empty or doesn't exist"
 aws s3api delete-bucket --bucket $DISCOVERY_BUCKET --region $AWS_DEFAULT_REGION 2>/dev/null || echo "Discovery bucket already deleted or doesn't exist"
 
-# Clean up local files specific to this stack
-echo "Cleaning up local files..."
-rm -rf keys-$suffix
-rm -f aws/keys-$suffix.json
-rm -f aws/discovery-$suffix.json
-rm -f aws/s3-readonly-policy-$suffix.json
-rm -f aws/irp-trust-policy-$suffix.json
-rm -f echoer/s3-echoer-$suffix.yaml
-rm -f kind-irsa-$suffix-config.yaml
-
-# Clean up directories if they are completely empty
-if [ -d "aws" ] && [ -z "$(ls -A aws)" ]; then
-    echo "Removing empty aws directory..."
-    rmdir aws
-fi
-
-if [ -d "echoer" ] && [ -z "$(ls -A echoer)" ]; then
-    echo "Removing empty echoer directory..."
-    rmdir echoer
+# Clean up stack directory
+echo "Cleaning up stack directory..."
+if [ -d "$STACK_DIR" ]; then
+    rm -rf "$STACK_DIR"
+    echo "Removed: $STACK_DIR"
+else
+    echo "Stack directory not found: $STACK_DIR"
 fi
 
 echo ""

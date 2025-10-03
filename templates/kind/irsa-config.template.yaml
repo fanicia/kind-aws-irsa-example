@@ -12,7 +12,7 @@ kubeadmConfigPatches:
 nodes:
 - role: control-plane
   extraMounts:
-  - hostPath: PWD/keys-SUFFIX/ # <-- only use full paths here. local paths won't work
+  - hostPath: PWD/keys/ # <-- only use full paths here. local paths won't work
     containerPath: /etc/ca-certificates/irsa/ # <-- Make sure to use a path under /ca-certificates as that is mounted in to the apiserver
     readOnly: true
 - role: worker
