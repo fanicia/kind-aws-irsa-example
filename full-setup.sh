@@ -139,7 +139,7 @@ echo "pod-identity-webhook is ready! Creating the echoer..."
 
 kubectl create sa s3-echoer
 kubectl annotate sa s3-echoer eks.amazonaws.com/role-arn=$S3_ROLE_ARN
-sed -e "s;SUFFIX;${suffix};g" templates/s3-echoer/s3-echoer-job.template.yaml >"$STACK_DIR/echoer/s3-echoer.yaml"
+sed -e "s;SUFFIX;${suffix};g" -e "s;AWS_REGION_PLACEHOLDER;${AWS_DEFAULT_REGION};g" templates/s3-echoer/s3-echoer-job.template.yaml >"$STACK_DIR/echoer/s3-echoer.yaml"
 kubectl create -f "$STACK_DIR/echoer/s3-echoer.yaml"
 
 echo "The Demo S3 bucket as below:"

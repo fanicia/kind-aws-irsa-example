@@ -17,6 +17,30 @@ Each run automatically generates a unique UUID-based identifier, allowing multip
 ./full-setup.sh "my-dev-stack"
 ```
 
+## Configuration
+
+### AWS Region
+
+By default, all AWS resources (S3 buckets, IAM roles, OIDC providers) are created in `eu-west-1`. You can override this by setting the `AWS_DEFAULT_REGION` environment variable:
+
+```bash
+# Use default region (eu-west-1)
+./full-setup.sh
+
+# Use a different region
+AWS_DEFAULT_REGION=us-west-2 ./full-setup.sh
+
+# Combine with custom stack identifier
+AWS_DEFAULT_REGION=ap-southeast-1 ./full-setup.sh "my-dev-stack"
+```
+
+The region configuration affects:
+- S3 bucket locations for OIDC discovery and demo output
+- OIDC provider endpoint URLs
+- IAM resource creation
+- Kubernetes pod environment variables
+
+**Note:** Make sure to use the same region when running the teardown script, or specify the suffix of the stack you want to delete.
 
 ## Prerequisites
 
@@ -50,7 +74,7 @@ The teardown script will automatically detect deployed stacks and present an int
 This script will delete:
 - Kind cluster (`irsa-<suffix>`)
 - IAM role (`s3-echoer-<suffix>`)
-- OIDC provider (`s3.us-east-2.amazonaws.com/aws-irsa-oidc-discovery-<suffix>`)
+- OIDC provider (`s3.eu-west-1.amazonaws.com/aws-irsa-oidc-discovery-<suffix>`)
 - S3 buckets (`aws-irsa-oidc-discovery-<suffix>` and `output-bucket-s3-echoer-<suffix>`)
 - Local files specific to the stack (keys, configs, and generated manifests)
 - Empty `aws/` and `echoer/` directories (if no other stacks remain)

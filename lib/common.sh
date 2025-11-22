@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export AWS_PAGER=""
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-2}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-eu-west-1}"
 
 # Check if required binaries are installed. Exits with error if any are missing.
 # Usage: check_prerequisites cmd1 cmd2 cmd3 ...
