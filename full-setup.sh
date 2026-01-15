@@ -75,7 +75,7 @@ aws iam create-open-id-connect-provider \
 # Setup k8s cluster:
 kind delete cluster --name irsa-$suffix
 
-sed -e "s;SUFFIX;${suffix};g; s;PWD;${STACK_DIR};g; s;DISCOVERY_BUCKET;${DISCOVERY_BUCKET};g" templates/kind/irsa-config.template.yaml >"$STACK_DIR/kind-irsa-config.yaml"
+sed -e "s;SUFFIX;${suffix};g; s;PWD;${STACK_DIR};g; s;HOSTNAME;${HOSTNAME};g; s;DISCOVERY_BUCKET;${DISCOVERY_BUCKET};g" templates/kind/irsa-config.template.yaml >"$STACK_DIR/kind-irsa-config.yaml"
 kind create cluster --config "$STACK_DIR/kind-irsa-config.yaml" --name irsa-$suffix
 echo "Cluster has been set up. Setting up cert manager in a couple of seconds:"
 
